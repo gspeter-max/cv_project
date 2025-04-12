@@ -174,7 +174,16 @@ def trial_objective(params):
 
     model.fit(x_train_,y_train_)
     y_pred = model.predict_proba(x_test_)[:,1]
-    return roc_auc_score(y_test_,y_pred)
+    def custom_loss(y_tested, y_predicted):
+        print(y_tested.shape) 
+        print(y_predicted.shape) 
+        fn = len(y_predicted[(y_predicted == 0) & (y_tested == 1)])
+        tn = len(y_predicted[(y_predicted == 0) & (y_tested == 1)]) 
+
+        diff = tn - fn 
+        return np.log(1 + np.exp(-diff))
+
+    return custom_loss(y_test_.to_numpy().flatten(), y_pred) 
 
 best = fmin(trial_objective, space = space, algo =tpe.suggest, max_evals= 40, trials = Trials()) 
 best_hyperopt = {'learning_rate': np.float64(0.00010169776502555072), 'max_detph': np.float64(35.0), 'n_estimator': np.float64(225.0), 'num_leaves': np.float64(26.0)}
@@ -198,8 +207,16 @@ def objective(trials):
     model = LGBMClassifier(**params) 
     model.fit(x_train_, y_train_) 
     y_pred = model.predict_proba(x_test_)[:,1]
+    def custom_loss(y_tested, y_predicted):
+        print(y_tested.shape) 
+        print(y_predicted.shape) 
+        fn = len(y_predicted[(y_predicted == 0) & (y_tested == 1)])
+        tn = len(y_predicted[(y_predicted == 0) & (y_tested == 1)]) 
 
-    return roc_auc_score(y_test_, y_pred) 
+        diff = tn - fn 
+        return np.log(1 + np.exp(-diff))
+
+    return custom_loss(y_test_.to_numpy().flatten(), y_pred) 
 
 study = optuna.create_study(direction = 'maximize')
 study.optimize(objective , n_trials = 30)
