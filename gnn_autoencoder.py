@@ -148,9 +148,11 @@ result = model(adj_tensor,features)
 
 from torch.optim import Adam
 from torch.nn import BCELoss
+from torch.optim.lr_schuduler import ReduceLROnPlateau
 
 optimizer  = Adam(model.parameters(), lr = 0.001)
 loss_func = BCELoss()
+scheduler = ReduceLROnPlateau(optimizer,mode = 'min', patience= 5)
 
 for epoch in range(100):
     model.train()
@@ -162,6 +164,7 @@ for epoch in range(100):
     loss = loss_func(y_pred,adj)
     loss.backward()
     optimizer.step()
+    scheduler.step(loss) 
 
     if epoch % 10 == 0:
         print(f'epochs --: {epoch}  loss - {loss}')
