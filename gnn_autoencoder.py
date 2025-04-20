@@ -11,7 +11,7 @@ class gnnlayer(torch.nn.Module):
 
     def forward(self,adj,features, function  = None):
         i = torch.eye(adj.size(0),device = adj.device)
-        a_hat = torch.clip(adj + i)
+        a_hat = torch.clip(adj + i,0,1)
 
         sums = torch.sum(a_hat,dim = 1)
         norm_term = torch.pow(sums,-0.5)
