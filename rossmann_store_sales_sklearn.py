@@ -29,6 +29,7 @@ class data_pipeline:
             polars.col('Date').dt.week().alias('Yearofweek')
         ])
 
+
         for i, month_values in enumerate(df2['PromoInterval']):
             month_values = month_values.split(',')
             for sub_month_values in month_values:
@@ -60,14 +61,6 @@ class data_pipeline:
             how = 'left'
         )
 
-        df_numeric = final_df.select(polars.col(polars.Int64, polars.Float64,polars.Int32,polars.Float32))
-
-        mins = df_numeric.min()
-        maxs = df_numeric.max()
-
-        for columns in df_numeric.columns:
-            final_df = final_df.with_columns((polars.col(columns) - mins[columns]) / (maxs[columns] - mins[columns]))
-
         return final_df
 
 train_df = data_pipeline('/content/drive/MyDrive/train_store_data.csv').forward()
@@ -75,14 +68,23 @@ train_df = data_pipeline('/content/drive/MyDrive/train_store_data.csv').forward(
 # print(len(train_df.columns))
 # print(len(test_df.columns))
 
-
 def split_data(df,return_x = False):
     x = df.drop('Sales','Store','Date' ,'Customers')
     y = df.select('Sales')
     return x, y
 
-x,y = split_data(train_df)
-x,y = x.to_numpy() , y.to_numpy()
+x, y = split_data(train_df)
+
+df_numeric = x.select(polars.col(polars.Int64, polars.Float64,polars.Int32,polars.Float32))
+
+mins = df_numeric.min()
+maxs = df_numeric.max()
+
+for columns in df_numeric.columns:
+    x = x.with_columns((polars.col(columns) - mins[columns]) / (maxs[columns] - mins[columns]))
+
+
+x, y = x.to_numpy() , y.to_numpy()
 
 test_df = data_pipeline('/content/drive/MyDrive/test_rossanmand.csv').forward().drop('Id','Store','Date').to_numpy()
 # x , y = x[:10000,:].to_numpy(), y[:10000].to_numpy()
@@ -93,8 +95,7 @@ import numpy as np
 
 sns.histplot(y,kde = True) ; plt.show()
 sns.histplot(np.log1p(y),kde = True) ; plt.show()
-
-# model 
+sns.histplot(x[:10000,:],kde = True) ; plt.show()
 
 from sklearn.model_selection import train_test_split
 import lightgbm as lgb
@@ -103,6 +104,10 @@ import numpy as np
 
 
 x_train, x_val , y_train, y_val = train_test_split(x,y,test_size = 0.2,random_state = 42)
+
+"""
+
+# do taht if you have good machine
 
 def objective(trials):
 
@@ -136,16 +141,16 @@ def objective(trials):
     return - np.mean(np.abs(np.expm1(y_pred - y_val)))
 
 create_study = optuna.create_study(direction= 'maximize')
-create_study.optimize(objective,n_trials = 20)
+create_study.optimize(objective,n_trials = 20)"""
 
 from sklearn.metrics import mean_absolute_error
-best_params = create_study.best_params
+# best_params = create_study.best_params
 
-# best_params = {'boosting_type': 'gbdt', 'max_depth': 10, 'num_leaves': 109, 'learning_rate': 0.011, 'min_child_samples': 30, 'reg_alpha': 0.08512988788905049, 'reg_lambda': 0.034522768357719315, 'subsample': 0.6852853676304876, 'colsample_bytree': 0.851591132790986, 'stopping_rounds': 16}
+best_params = {'boosting_type': 'gbdt', 'max_depth': -1, 'num_leaves': 200, 'learning_rate': 0.011, 'min_child_samples': 30, 'reg_alpha': 0.08512988788905049, 'reg_lambda': 0.034522768357719315, 'subsample': 0.6852853676304876, 'colsample_bytree': 0.851591132790986, 'stopping_rounds': 16}
 stopping_rounds = best_params['stopping_rounds']
 del best_params['stopping_rounds']
 
-best_params['n_estimators'] = 1000
+best_params['n_estimators'] = 5000
 
 best_model = lgb.LGBMRegressor(**best_params)
 best_model.fit(
@@ -153,9 +158,12 @@ best_model.fit(
     eval_set=[(x_val,np.log1p(y_val))],
     callbacks = [
         lgb.early_stopping(stopping_rounds=stopping_rounds),
-        lgb.log_evaluation(50)
+        lgb.log_evaluation(10)
     ]
 )
-y_pred_val = best_model.predict(x_val)
-print((np.expm1(y_pred_val) ,y_val))
-print(mean_absolute_error(y_val ,np.expm1(y_pred_val)))
+y1_pred_val = best_model.predict(x_val)
+print((np.expm1(y1_pred_val) ,y_val))
+print(mean_absolute_error(y_val ,np.expm1(y1_pred_val)))
+
+y_pred = np.expm1(best_model.predict(test_df)) 
+print(y_pred)
