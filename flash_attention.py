@@ -75,23 +75,21 @@ class flash_attention(nn.Module):
 
                     score = query_block @ key_block.T / (self.dim ** 0.5)
 
-                    if start_j_idx > end_i_idx: 
+                    if end_i_idx <= start_j_idx: 
                         """ If the key block starts after the query block ends, skip it
                         This is to ensure that we do not compute attention for keys that are not relevant 
                         to the current query block. """
 
                         continue
-                    elif start_i_idx >= end_j_idx:
-                        """ If the query block starts after the key block ends, skip it
-                        This is to ensure that we do not compute attention for queries that are not relevant
-                        to the current key block. """
+                    if end_i_idx > start_j_idx:
 
-                        continue
-                    else:
                         """ If the query block and key block overlap, we need to apply a causal mask
                         to ensure that we do not attend to future tokens. """
-                        casual_mask = torch.triu(torch.ones(score.shape), diagonal=1)
-                        score = score.masked_fill(casual_mask.bool(), -float('inf'))
+
+                        row_index = torch.arange(start_i_idx, end_i_idx).unsqueeze(1)
+                        col_index = torch.arange(start_j_idx, end_j_idx).unsqueeze(0) 
+                        causal_mask = row_index < col_index 
+                        score = score.masked_fill(causal_mask, -float('inf'))
 
                     __max = torch.max(score, dim=-1, keepdim=True)
                     _new_max = torch.maximum(previous_max, __max.values)
